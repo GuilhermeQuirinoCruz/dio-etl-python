@@ -1,4 +1,5 @@
 from bardapi import Bard
+import pandas
 import os
 import requests
 
@@ -21,9 +22,28 @@ session.headers = {
 session.cookies.set("__Secure-1PSID", os.getenv("_BARD_API_KEY"))
 
 bard = Bard(session=session)
+bard.get_answer("Short, one-sentence answers, I'm in a hurry, no fluff, just the facts.")
+review_options = ["Terrible", "Very Bad", "Bad", "Neutral", "Ok", "Good", "Very Good", "Excellent"]
+bard.get_answer(f"I'm gonna give you a list of reviews, in the format: title: [title], review: [review], rating: [rating] and I want you to answer with one of the following representing how positive it is: {[review_options]}. If you can't decide, answer '---'. Keep a consistent style when answering")
 
-bard_output = bard.get_answer("Escolha um nome qualquer de pessoa")['content']
-print(bard_output)
+def analyze_review(title, review, rating):
+    formatted_review = f"title: [{title}], review: [{review}], rating: [{rating}]"
+    bard_answer = bard.get_answer(formatted_review)['content']
+    analysis = bard_answer.split("\n")[0]
+    return analysis
 
-bard_output = bard.get_answer("Adicione um sobrenome e me diga o nome inteiro")['content']
-print(bard_output)
+LINE_LIMIT_CSV = 50
+data_frame = pandas.read_csv("chatgpt_reviews.csv", nrows=LINE_LIMIT_CSV)
+reviews = data_frame.to_dict()
+analyzed_reviews = []
+
+for i in range(LINE_LIMIT_CSV):
+    title = reviews["title"][i]
+    review_text = reviews["review"][i]
+    rating = reviews["rating"][i]
+    analysis = analyze_review(title, review_text, rating)
+
+    analyzed_reviews.append([title, review_text, rating, analysis])
+
+data_frame_analyzed = pandas.DataFrame(analyzed_reviews, columns=["original_title", "review", "rating", "analysis"])
+data_frame_analyzed.to_csv("chatgpt_analyzed_reviews.csv", index=False)
